@@ -1,11 +1,32 @@
-import { generateText } from "ai";
-// Import the google module from the ai-sdk package
+import { stepCountIs, streamText } from "ai";
 import { google } from "@ai-sdk/google";
+import { SYSTEM_PROMPT } from "./prompts";
+import {
+    getFileChangesInDirectoryTool,
+    generateCommitMessageTool,
+    generateMarkdownFileTool,
+} from "./tools";
 
-// Specify the model to use for generating text and a prompt
-const { text } = await generateText({
+// Code review agent
+const codeReviewAgent = async (prompt: string) => {
+  const result = streamText({
     model: google("models/gemini-2.5-flash"),
-    prompt: "What is an AI agent?",
-});
+    prompt,
+    system: SYSTEM_PROMPT,
+    tools: {
+      getFileChangesInDirectoryTool: getFileChangesInDirectoryTool,
+      generateCommitMessageTool: generateCommitMessageTool,
+      generateMarkdownFileTool: generateMarkdownFileTool,
+    },
+    stopWhen: stepCountIs(10),
+  });
 
-console.log(text);
+  for await (const chunk of result.textStream) {
+    process.stdout.write(chunk);
+  }
+};
+
+// Specify which directory the code review agent should review changes in your prompt
+await codeReviewAgent(
+  "Review the code changes in '../my-agent' directory, make your reviews and suggestions file by file, then generate a detailed markdown report of your findings and save it as 'code-review-report.md', and finally create a commit with an appropriate commit message based on the changes you reviewed",
+);
